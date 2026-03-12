@@ -8,11 +8,12 @@ const taskRouter = Router();
 
 
 // CREATE TASK
-taskRouter.post("/", auth, async (req: AuthRequest, res) => {
+taskRouter.post("/", auth, async (req: AuthRequest, res): Promise<void> => {
   try {
 
     if (!req.body.title || !req.body.description || !req.body.dueAt) {
-      return res.status(400).json({ error: "Missing required fields" });
+      res.status(400).json({ error: "Missing required fields" });
+      return;
     }
 
     const newTask: NewTask = {
@@ -26,17 +27,19 @@ taskRouter.post("/", auth, async (req: AuthRequest, res) => {
       .values(newTask)
       .returning();
 
-    return res.status(201).json(task);
+    res.status(201).json(task);
+    return;
 
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: "Failed to create task" });
+    res.status(500).json({ error: "Failed to create task" });
+    return;
   }
 });
 
 
 // GET ALL TASKS
-taskRouter.get("/", auth, async (req: AuthRequest, res) => {
+taskRouter.get("/", auth, async (req: AuthRequest, res): Promise<void> => {
   try {
 
     const allTasks = await db
@@ -44,17 +47,19 @@ taskRouter.get("/", auth, async (req: AuthRequest, res) => {
       .from(tasks)
       .where(eq(tasks.uid, req.user!));
 
-    return res.json(allTasks);
+    res.json(allTasks);
+    return;
 
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: "Failed to fetch tasks" });
+    res.status(500).json({ error: "Failed to fetch tasks" });
+    return;
   }
 });
 
 
 // UPDATE TASK
-taskRouter.put("/:taskId", auth, async (req: AuthRequest, res) => {
+taskRouter.put("/:taskId", auth, async (req: AuthRequest, res): Promise<void> => {
   try {
 
     const { taskId } = req.params;
@@ -77,20 +82,23 @@ taskRouter.put("/:taskId", auth, async (req: AuthRequest, res) => {
       .returning();
 
     if (!task) {
-      return res.status(404).json({ error: "Task not found" });
+      res.status(404).json({ error: "Task not found" });
+      return;
     }
 
-    return res.json(task);
+    res.json(task);
+    return;
 
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: "Failed to update task" });
+    res.status(500).json({ error: "Failed to update task" });
+    return;
   }
 });
 
 
 // DELETE TASK
-taskRouter.delete("/:taskId", auth, async (req: AuthRequest, res) => {
+taskRouter.delete("/:taskId", auth, async (req: AuthRequest, res): Promise<void> => {
   try {
 
     const { taskId } = req.params;
@@ -104,23 +112,26 @@ taskRouter.delete("/:taskId", auth, async (req: AuthRequest, res) => {
         )
       );
 
-    return res.json({ success: true });
+    res.json({ success: true });
+    return;
 
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: "Failed to delete task" });
+    res.status(500).json({ error: "Failed to delete task" });
+    return;
   }
 });
 
 
 // SYNC TASKS (OFFLINE SUPPORT)
-taskRouter.post("/sync", auth, async (req: AuthRequest, res) => {
+taskRouter.post("/sync", auth, async (req: AuthRequest, res): Promise<void> => {
   try {
 
     const tasksList = req.body;
 
     if (!Array.isArray(tasksList)) {
-      return res.status(400).json({ error: "Invalid task list" });
+      res.status(400).json({ error: "Invalid task list" });
+      return;
     }
 
     const filteredTasks: NewTask[] = [];
@@ -141,11 +152,13 @@ taskRouter.post("/sync", auth, async (req: AuthRequest, res) => {
       .onConflictDoNothing()   // prevents duplicate tasks
       .returning();
 
-    return res.status(201).json(pushedTasks);
+    res.status(201).json(pushedTasks);
+    return;
 
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: "Failed to sync tasks" });
+    res.status(500).json({ error: "Failed to sync tasks" });
+    return;
   }
 });
 

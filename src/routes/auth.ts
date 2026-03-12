@@ -78,7 +78,7 @@ authRouter.post(
         return;
       }
 
-      const token = jwt.sign({ id: existingUser.id }, "passwordKey");
+      const token = jwt.sign({ id: existingUser.id }, process.env.JWT_SECRET || "passwordKey");
 
       res.json({ token, ...existingUser });
     } catch (e) {

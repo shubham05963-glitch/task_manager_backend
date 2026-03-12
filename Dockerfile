@@ -1,11 +1,18 @@
-FROM node:20
+FROM node:20-alpine
 
 WORKDIR /app
 
+# Copy package.json and install dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy the rest of the application
 COPY . .
 
-RUN npm install
+# Build TypeScript
+RUN npm run build
 
 EXPOSE 8000
 
-CMD ["npm", "run", "dev"]
+# Start the application
+CMD ["npm", "start"]

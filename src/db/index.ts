@@ -29,41 +29,82 @@ try {
   throw new Error(`Invalid DATABASE_URL: ${(error as Error).message}`);
 }
 
+const getNormalizedDbUrl = (rawUrl: string): string => {
+  const parsed = new URL(rawUrl);
+  const host = parsed.hostname.toLowerCase();
+  const isRenderDb = host.includes("render.com") || host.includes("onrender.com");
+
+  if (isRenderDb) {
+    if (!parsed.searchParams.has("sslmode")) {
+      parsed.searchParams.set("sslmode", "require");
+    }
+    if (!parsed.searchParams.has("uselibpqcompat")) {
+      parsed.searchParams.set("uselibpqcompat", "true");
+    }
+  }
+
+  return parsed.toString();
+};
+
 const pool = new Pool({
-  connectionString: dbUrl,
+  connectionString: getNormalizedDbUrl(dbUrl),
   // Keep SSL behavior controlled by DATABASE_URL query params (sslmode=...).
   max: NODE_ENV === "production" ? 20 : 10,
   idleTimeoutMillis: NODE_ENV === "production" ? 30000 : 10000,
   connectionTimeoutMillis: 10000,
 });
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const withDbRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
+  const maxAttempts = 5;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`DB attempt ${attempt}/${maxAttempts} failed:`, message);
+      if (attempt < maxAttempts) {
+        await sleep(1500 * attempt);
+      }
+    }
+  }
+
+  throw lastError;
+};
+
 const initDatabase = async (): Promise<void> => {
-  // Ensure extensions and tables exist even when migrations were not applied on deployment.
-  await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+  await withDbRetry(async () => {
+    // Ensure extensions and tables exist even when migrations were not applied on deployment.
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      name TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS tasks (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      hex_color TEXT NOT NULL,
-      uid UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      due_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        hex_color TEXT NOT NULL,
+        uid UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        due_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+  });
 };
 
 if (NODE_ENV === "development") {

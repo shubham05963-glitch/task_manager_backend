@@ -29,17 +29,9 @@ try {
   throw new Error(`Invalid DATABASE_URL: ${(error as Error).message}`);
 }
 
-const dbHost = new URL(dbUrl).hostname.toLowerCase();
-const isManagedRemoteDb =
-  dbHost.includes("render.com") ||
-  dbHost.includes("neon.tech") ||
-  dbHost.includes("supabase.co");
-
 const pool = new Pool({
   connectionString: dbUrl,
-  // Managed Postgres providers usually require SSL. Disable cert verification
-  // only for these hosted DB endpoints to prevent TLS handshake termination.
-  ssl: isManagedRemoteDb ? { rejectUnauthorized: false } : undefined,
+  // Keep SSL behavior controlled by DATABASE_URL query params (sslmode=...).
   max: NODE_ENV === "production" ? 20 : 10,
   idleTimeoutMillis: NODE_ENV === "production" ? 30000 : 10000,
   connectionTimeoutMillis: 10000,

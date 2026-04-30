@@ -49,7 +49,8 @@ authRouter.post(
       const [user] = await db.insert(users).values(newUser).returning();
       res.status(201).json(user);
     } catch (e) {
-      res.status(500).json({ error: e });
+      console.error("Signup error:", e);
+      res.status(500).json({ error: "Failed to sign up. Please try again." });
     }
   }
 );
@@ -82,7 +83,8 @@ authRouter.post(
 
       res.json({ token, ...existingUser });
     } catch (e) {
-      res.status(500).json({ error: e });
+      console.error("Login error:", e);
+      res.status(500).json({ error: "Failed to login. Please try again." });
     }
   }
 );

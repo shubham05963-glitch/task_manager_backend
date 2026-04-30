@@ -18,12 +18,39 @@ interface LoginBody {
   password: string;
 }
 
+const getReadableAuthError = (error: unknown): string => {
+  const message =
+    error instanceof Error ? error.message : String(error ?? "Unknown error");
+
+  if (
+    message.includes("does not exist") ||
+    message.includes("relation") ||
+    message.includes("users")
+  ) {
+    return "Database is not ready. Please run backend migrations and try again.";
+  }
+
+  if (
+    message.includes("ENOTFOUND") ||
+    message.includes("getaddrinfo") ||
+    message.includes("connect ECONNREFUSED")
+  ) {
+    return "Database connection failed. Please check DATABASE_URL on deployment.";
+  }
+
+  return "Auth service error. Please try again.";
+};
+
 authRouter.post(
   "/signup",
   async (req: Request<{}, {}, SignUpBody>, res: Response) => {
     try {
       // get req body
       const { name, email, password } = req.body;
+      if (!name || !email || !password) {
+        res.status(400).json({ error: "Name, email and password are required." });
+        return;
+      }
       // check if the user already exists
       const existingUser = await db
         .select()
@@ -50,7 +77,7 @@ authRouter.post(
       res.status(201).json(user);
     } catch (e) {
       console.error("Signup error:", e);
-      res.status(500).json({ error: "Failed to sign up. Please try again." });
+      res.status(500).json({ error: getReadableAuthError(e) });
     }
   }
 );
@@ -61,6 +88,10 @@ authRouter.post(
     try {
       // get req body
       const { email, password } = req.body;
+      if (!email || !password) {
+        res.status(400).json({ error: "Email and password are required." });
+        return;
+      }
 
       // check if the user doesnt exist
       const [existingUser] = await db
@@ -84,7 +115,7 @@ authRouter.post(
       res.json({ token, ...existingUser });
     } catch (e) {
       console.error("Login error:", e);
-      res.status(500).json({ error: "Failed to login. Please try again." });
+      res.status(500).json({ error: getReadableAuthError(e) });
     }
   }
 );
@@ -100,7 +131,7 @@ authRouter.post("/tokenIsValid", async (req, res) => {
     }
 
     // verify if the token is valid
-    const verified = jwt.verify(token, "passwordKey");
+    const verified = jwt.verify(token, process.env.JWT_SECRET || "passwordKey");
 
     if (!verified) {
       res.json(false);

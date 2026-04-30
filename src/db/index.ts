@@ -36,6 +36,35 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
+const initDatabase = async (): Promise<void> => {
+  // Ensure extensions and tables exist even when migrations were not applied on deployment.
+  await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      hex_color TEXT NOT NULL,
+      uid UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      due_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+};
+
 if (NODE_ENV === "development") {
   pool.on("connect", () => {
     console.log("Database connection opened");
@@ -47,3 +76,4 @@ if (NODE_ENV === "development") {
 }
 
 export const db = drizzle(pool);
+export { initDatabase };

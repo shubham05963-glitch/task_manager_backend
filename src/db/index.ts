@@ -87,10 +87,29 @@ const initDatabase = async (): Promise<void> => {
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
+        is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+        verification_otp TEXT,
+        verification_otp_expires_at TIMESTAMP,
+        reset_otp TEXT,
+        reset_otp_expires_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE;`,
+    );
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_otp TEXT;`,
+    );
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_otp_expires_at TIMESTAMP;`,
+    );
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_otp TEXT;`);
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_otp_expires_at TIMESTAMP;`,
+    );
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tasks (
